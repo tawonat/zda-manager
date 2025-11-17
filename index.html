@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLLI</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Estilos para os filtros de período */
+        .periodo-filters {
+            background: var(--color-surface);
+            border: 1px solid var(--color-card-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-20);
+            margin-bottom: var(--space-24);
+            display: flex;
+            align-items: center;
+            gap: var(--space-16);
+            flex-wrap: wrap;
+        }
+
+        .periodo-filters__label {
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text);
+        }
+
+        .periodo-filters__buttons {
+            display: flex;
+            gap: var(--space-8);
+        }
+
+        .periodo-btn {
+            min-width: 100px;
+            transition: all var(--duration-fast) var(--ease-standard);
+        }
+
+        .periodo-btn.active {
+            background: var(--color-primary);
+            color: var(--color-btn-primary-text);
+            border-color: var(--color-primary);
+        }
+
+        .periodo-btn:not(.active):hover {
+            background: var(--color-secondary);
+            border-color: var(--color-primary);
+        }
+
+        @media (max-width: 768px) {
+            .periodo-filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .periodo-filters__buttons {
+                width: 100%;
+            }
+
+            .periodo-btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Olli - Sistema de Agendamento de Manutenção</h1>
+            <p class="subtitle" id="mainSubtitle">Processe as Ordens de Serviço do TOTVS</p>
+        </header>
+
+        <!-- Upload Section -->
+        <div id="uploadSection" class="upload-section">
+            <div class="single-upload-container">
+                <div class="upload-area" id="dropzoneOrdens">
+                    <div class="upload-text">Arraste ou clique para carregar a planilha de Ordens de Serviço (TOTVS)</div>
+                    <div class="upload-subtext">Formatos aceitos: .xlsx, .xls</div>
+                </div>
+                <input type="file" id="fileOrdens" accept=".xlsx,.xls" style="display: none;">
+                <div class="file-status" id="fileStatus" style="display: none;">
+                    <div class="file-status__icon">✓</div>
+                    <div class="file-status__text" id="fileStatusText"></div>
+                </div>
+            </div>
+
+            <div class="upload-actions">
+                <button class="btn btn--primary btn--full-width btn--lg" id="processBtn" disabled>
+                    <span id="processBtnText">PROCESSAR ORDENS</span>
+                    <span class="spinner" id="processSpinner" style="display: none;"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard de Estatísticas -->
+        <div id="resultsSection" style="display: none;">
+
+
+        <!-- NOVO: Filtros de Período -->
+        <div class="periodo-filters">
+            <div class="periodo-filters__label">Período de Visualização:</div>
+            <div class="periodo-filters__buttons">
+                <button class="btn btn--outline periodo-btn" id="filtroDiario">Diário</button>
+                <button class="btn btn--outline periodo-btn" id="filtroSemanal">Semanal</button>
+                <button class="btn btn--outline periodo-btn active" id="filtroMensal">Mensal</button>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="stat-card stat-card--primary">
+                <div class="stat-card__content">
+                    <div class="stat-card__label">Total de Ordens Processadas</div>
+                    <div class="stat-card__value" id="totalOS">0</div>
+                </div>
+            </div>
+            <div class="stat-card stat-card--success">
+                <div class="stat-card__content">
+                    <div class="stat-card__label">Ordens Agendadas</div>
+                    <div class="stat-card__value" id="agendadas">0</div>
+                </div>
+            </div>
+            <div class="stat-card stat-card--warning">
+                <div class="stat-card__content">
+                    <div class="stat-card__label">Tempo Total de Trabalho</div>
+                    <div class="stat-card__value" id="horasTotais">0h</div>
+                </div>
+            </div>
+            <div class="stat-card stat-card--info">
+                <div class="stat-card__content">
+                    <div class="stat-card__label">Manutentores Alocados</div>
+                    <div class="stat-card__value" id="taxaUtilizacao">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas -->
+        <div id="alertContainer"></div>
+
+        <!-- Navegação por Abas -->
+        <div class="tabs">
+            <button class="tab-button active" data-tab="agenda">AGENDA COMPLETA</button>
+            <button class="tab-button" data-tab="tecnicos">CALENDÁRIO TÉCNICOS</button>
+            <button class="tab-button" data-tab="timeline">TIMELINE VISUAL</button>
+            <button class="tab-button" data-tab="estatisticas">ESTATÍSTICAS</button>
+        </div>
+
+        <!-- Conteúdo das Abas -->
+        <div class="tab-content">
+            <!-- Aba 1: AGENDA PROCESSADA -->
+            <div class="tab-pane active" id="agenda">
+                <div class="card">
+                    <div class="card__body">
+                        <div class="flex" style="justify-content: space-between; align-items: center; margin-bottom: var(--space-16);">
+                            <h2>Agenda Completa</h2>
+                            <div class="flex" style="gap: var(--space-12);">
+                                <button class="btn btn--outline" id="editAgendaBtn">Editar Agenda</button>
+                                <button class="btn btn--primary" id="reprocessBtn">Reprocessar</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Edit Mode Header -->
+                        <div id="editModeHeader" class="edit-mode-header" style="display: none;">
+                            <div class="edit-mode-title">
+                                <span style="font-size: 24px; margin-right: var(--space-8);">✏️</span>
+                                <div>
+                                    <h3 style="margin: 0; font-size: var(--font-size-xl);">Modo de Edição - Ajuste a Agenda</h3>
+                                    <p style="margin: var(--space-4) 0 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary);">Faça as alterações necessárias e clique em "Salvar Alterações"</p>
+                                </div>
+                            </div>
+                            <div class="flex" style="gap: var(--space-8);">
+                                <button class="btn btn--outline" id="undoChangesBtn">Desfazer</button>
+                                <button class="btn btn--primary" id="saveChangesBtn">Salvar Alterações</button>
+                                <button class="btn btn--outline" id="cancelEditBtn">Cancelar Edição</button>
+                            </div>
+                        </div>
+                        <p class="text-secondary">Todas as ordens processadas ordenadas por prioridade e data</p>
+                        
+                        <div class="filters" style="display: flex; gap: var(--space-12); margin: var(--space-20) 0; flex-wrap: wrap;">
+                            <select class="form-control" id="filterTecnico" style="flex: 1; min-width: 200px;">
+                                <option value="">Todos os Técnicos</option>
+                            </select>
+                            <select class="form-control" id="filterCriticidade" style="flex: 1; min-width: 150px;">
+                                <option value="">Todas Criticidades</option>
+                                <option value="A">Criticidade A</option>
+                                <option value="B">Criticidade B</option>
+                                <option value="C">Criticidade C</option>
+                            </select>
+                            <select class="form-control" id="filterTipo" style="flex: 1; min-width: 200px;">
+                                <option value="">Todos os Tipos</option>
+                                <option value="PREVENTIVA">PREVENTIVA</option>
+                                <option value="CORRETIVA">CORRETIVA</option>
+                                <option value="CORRETIVA PROGRAMADA">CORRETIVA PROGRAMADA</option>
+                            </select>
+                            <button class="btn btn--outline" id="downloadExcelBtn">Download Excel</button>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="table" id="agendaTable">
+                                <thead>
+                                    <tr>
+                                        <th>OS ID</th>
+                                        <th>Bem</th>
+                                        <th>Nome do Bem</th>
+                                        <th>Tipo Serviço</th>
+                                        <th>Criticidade</th>
+                                        <th>Dias Aberta</th>
+                                        <th>Prioridade</th>
+                                        <th>Técnico Alocado</th>
+                                        <th>Data Agendada</th>
+                                        <th>Status</th>
+                                        <th>Previsão Início</th>
+                                        <th>Data Abertura</th>
+                                        <th>Real Início</th>
+                                        <th>Descrição</th>
+                                        <th id="actionsHeader" style="display: none;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="agendaTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba 2: TÉCNICOS & CARGA HORÁRIA -->
+            <div class="tab-pane" id="tecnicos">
+                <div class="card">
+                    <div class="card__body">
+                        <h2>Técnicos &amp; Carga Horária</h2>
+                        <p class="text-secondary">Distribuição de trabalho por técnico no período selecionado</p>
+                        
+                        <div class="technicians-grid" id="techniciansGrid">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba 3: TIMELINE VISUAL -->
+            <div class="tab-pane" id="timeline">
+                <div class="card">
+                    <div class="card__body">
+                        <h2>Timeline Visual</h2>
+                        <p class="text-secondary">Visualização das agendas dos técnicos no período selecionado (09:00 - 17:00)</p>
+                        
+                        <div id="timelineContainer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba 4: ESTATÍSTICAS -->
+            <div class="tab-pane" id="estatisticas">
+                <div class="card">
+                    <div class="card__body">
+                        <h2>Estatísticas</h2>
+                        <p class="text-secondary">Análise detalhada dos dados do período selecionado</p>
+                        
+                        <div class="charts-grid">
+                            <div class="chart-container">
+                                <h3>Distribuição por Criticidade</h3>
+                                <canvas id="chartCriticidade"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <h3>Ordens por Tipo</h3>
+                                <canvas id="chartTipo"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="metrics-table">
+                            <h3>Métricas por Técnico</h3>
+                            <div class="table-container">
+                                <table class="table" id="metricasTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Técnico</th>
+                                            <th>Ordens</th>
+                                            <th>Horas Totais</th>
+                                            <th>Preventiva</th>
+                                            <th>Corretiva</th>
+                                            <th>Programada</th>
+                                            <th>Utilização</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="metricasTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
